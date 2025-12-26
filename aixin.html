@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>爱心提示 - 逐个弹出版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            min-height: 100vh;
+            background-color: #f0f2f5;
+            font-family: "微软雅黑", "PingFang SC", sans-serif;
+            position: relative;
+            overflow: auto;
+        }
+        .control-bar {
+            position: fixed;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            display: flex;
+            gap: 10px;
+        }
+        .control-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 20px;
+            background-color: #ff6b81;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .control-btn:hover {
+            background-color: #ff4757;
+        }
+        .clear-btn {
+            background-color: #70a1ff;
+        }
+        .clear-btn:hover {
+            background-color: #3742fa;
+        }
+        .tip-card {
+            position: absolute;
+            width: 180px;
+            height: 45px;
+            line-height: 45px;
+            text-align: center;
+            border-radius: 8px;
+            font-size: 15px;
+            color: #333;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            transition: left 0.05s linear, top 0.05s linear;
+            opacity: 0;
+            animation: fadeIn 0.2s forwards;
+        }
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+            }
+        }
+        /* 手机适配 */
+        @media (max-width: 768px) {
+            .tip-card {
+                width: 140px;
+                height: 40px;
+                line-height: 40px;
+                font-size: 13px;
+            }
+            .control-bar {
+                flex-direction: column;
+                gap: 5px;
+                top: auto;
+                bottom: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="control-bar">
+        <button class="control-btn" onclick="returnToHeart()">返回爱心形状</button>
+        <button class="control-btn clear-btn" onclick="clearAllTips()">一键清空</button>
+    </div>
+
+    <script>
+        // 配置参数
+        const TIP_COUNT = 110;         // 提示框数量
+        const RETURN_STEPS = 20;       // 返回步数
+        const STEP_INTERVAL = 8;       // 每步间隔(ms)
+        const HEART_SCALE = 12;        // 爱心缩放比例
+        const CREATE_INTERVAL = 80;    // 逐个创建的间隔(ms)，和原脚本一致
+        // 提示语和背景色
+        const TIPS = [
+            '多喝水哦~', '保持微笑呀', '每天都要元气满满',
+            '记得吃水果', '保持好心情', '好好爱自己', '我想你了',
+            '梦想成真', '期待下一次见面', '金榜题名',
+            '顺顺利利', '早点休息', '愿所有烦恼都消失',
+            '别熬夜', '今天过得开心嘛', '天冷了，多穿衣服'
+        ];
+        const BG_COLORS = [
+            'lightpink', 'skyblue', 'lightgreen', 'lavender',
+            'lightyellow', 'plum', 'coral', 'bisque', 'aquamarine'
+        ];
+
+        let tipList = [];
+        let heartPoints = [];
+        let spreadTimer = null;
+
+        // 生成爱心坐标
+        function generateHeartPoints(count) {
+            let points = [];
+            for (let i = 0; i < count; i++) {
+                const ratio = i / (count - 1);
+                let t;
+                if (ratio < 0.5) {
+                    t = Math.PI * Math.pow(2 * ratio, 1.2);
+                } else {
+                    t = Math.PI + Math.PI * Math.pow(2 * (ratio - 0.5), 0.8);
+                }
+                const x = 16 * Math.pow(Math.sin(t), 3);
+                const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+                points.push({ x: x * HEART_SCALE, y: -y * HEART_SCALE });
+            }
+            return points;
+        }
+
+        // 逐个创建提示框
+        function createTipsOneByOne() {
+            heartPoints = generateHeartPoints(TIP_COUNT);
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            let index = 0;
+
+            const createTimer = setInterval(() => {
+                if (index >= TIP_COUNT) {
+                    clearInterval(createTimer);
+                    // 所有框创建完成后，1秒再散开
+                    spreadTimer = setTimeout(spreadTips, 1000);
+                    return;
+                }
+
+                const card = document.createElement('div');
+                card.className = 'tip-card';
+                card.textContent = TIPS[Math.floor(Math.random() * TIPS.length)];
+                card.style.backgroundColor = BG_COLORS[Math.floor(Math.random() * BG_COLORS.length)];
+                
+                const x = centerX + heartPoints[index].x;
+                const y = centerY + heartPoints[index].y;
+                card.style.left = `${x}px`;
+                card.style.top = `${y}px`;
+                document.body.appendChild(card);
+
+                tipList.push({
+                    el: card,
+                    origX: x,
+                    origY: y,
+                    currX: x,
+                    currY: y
+                });
+
+                index++;
+                // 每5个更新一次，优化性能
+                if (index % 5 === 0) {
+                    document.body.offsetHeight; // 触发重绘
+                }
+            }, CREATE_INTERVAL);
+        }
+
+        // 随机散开
+        function spreadTips() {
+            tipList.forEach(item => {
+                const targetX = Math.random() * (window.innerWidth - item.el.offsetWidth);
+                const targetY = Math.random() * (window.innerHeight - item.el.offsetHeight);
+                item.currX = targetX;
+                item.currY = targetY;
+                item.el.style.left = `${targetX}px`;
+                item.el.style.top = `${targetY}px`;
+            });
+        }
+
+        // 平滑返回爱心
+        function returnToHeart() {
+            if (spreadTimer) clearTimeout(spreadTimer);
+            let step = 0;
+            const timer = setInterval(() => {
+                step++;
+                tipList.forEach(item => {
+                    const moveX = (item.origX - item.currX) / RETURN_STEPS;
+                    const moveY = (item.origY - item.currY) / RETURN_STEPS;
+                    item.currX += moveX;
+                    item.currY += moveY;
+                    item.el.style.left = `${item.currX}px`;
+                    item.el.style.top = `${item.currY}px`;
+                });
+                if (step >= RETURN_STEPS) clearInterval(timer);
+            }, STEP_INTERVAL);
+        }
+
+        // 清空所有
+        function clearAllTips() {
+            if (spreadTimer) clearTimeout(spreadTimer);
+            tipList.forEach(item => item.el.remove());
+            tipList = [];
+        }
+
+        // 页面加载后逐个创建
+        window.onload = () => {
+            createTipsOneByOne();
+        };
+
+        // 窗口大小变化重新居中
+        window.onresize = () => {
+            if (tipList.length === 0) return;
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            tipList.forEach((item, index) => {
+                item.origX = centerX + heartPoints[index].x;
+                item.origY = centerY + heartPoints[index].y;
+            });
+        };
+    </script>
+</body>
+</html>
